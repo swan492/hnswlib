@@ -1195,7 +1195,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         int maxlevelcopy = maxlevel_;
         if (curlevel <= maxlevelcopy)
             templock.unlock();
-        tableint currObj = enterpoint_node_;
+        tableint currObj = enterpoint_node_; // the first node of maxlevel_
         tableint enterpoint_copy = enterpoint_node_;
 
         memset(data_level0_memory_ + cur_c * size_data_per_element_ + offsetLevel0_, 0, size_data_per_element_);
