@@ -1149,16 +1149,17 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         return result;
     }
 
-
+    //! int number_of_variables
+    //! int length_of_univariate
     tableint addPoint(const void *data_point, labeltype label, int level) {
         tableint cur_c = 0;
         {
             // Checking if the element with the same label already exists
             // if so, updating it *instead* of creating a new element.
             std::unique_lock <std::mutex> lock_table(label_lookup_lock);
-            auto search = label_lookup_.find(label);
+            auto search = label_lookup_.find(label);  // label_lookup_ -> std::unordered_map<labeltype, tableint>
             if (search != label_lookup_.end()) {
-                tableint existingInternalId = search->second;
+                tableint existingInternalId = search->second; // first: key; second: value
                 if (allow_replace_deleted_) {
                     if (isMarkedDeleted(existingInternalId)) {
                         throw std::runtime_error("Can't use addPoint to update deleted elements if replacement of deleted elements is enabled.");
@@ -1188,7 +1189,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         if (level > 0)
             curlevel = level;
 
-        element_levels_[cur_c] = curlevel;
+        element_levels_[cur_c] = curlevel; // element_levels -> std::vector<int> max_elements_
 
         std::unique_lock <std::mutex> templock(global);
         int maxlevelcopy = maxlevel_;
@@ -1210,15 +1211,19 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             memset(linkLists_[cur_c], 0, size_links_per_element_ * curlevel + 1);
         }
 
-        if ((signed)currObj != -1) {
+        if ((signed)currObj != -1) { // currObj -> enterpoint_node_
             if (curlevel < maxlevelcopy) {
+                //! need to calculate distances on each univariate individually
                 dist_t curdist = fstdistfunc_(data_point, getDataByInternalId(currObj), dist_func_param_);
                 for (int level = maxlevelcopy; level > curlevel; level--) {
+                    //! an new array of currObj is needed for each combination of variables 
+                    //! loop through all combinations of variables
                     bool changed = true;
                     while (changed) {
                         changed = false;
                         unsigned int *data;
                         std::unique_lock <std::mutex> lock(link_list_locks_[currObj]);
+                        //! set_of_variables 
                         data = get_linklist(currObj, level);
                         int size = getListCount(data);
 
@@ -1242,7 +1247,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             for (int level = std::min(curlevel, maxlevelcopy); level >= 0; level--) {
                 if (level > maxlevelcopy || level < 0)  // possible?
                     throw std::runtime_error("Level error");
-
+                //! loop through all combinations of variables
                 std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates = searchBaseLayer(
                         currObj, data_point, level);
                 if (epDeleted) {
@@ -1266,13 +1271,15 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         return cur_c;
     }
 
-
+    //! length_of_univariate
+    //! set_of_variables 
     std::priority_queue<std::pair<dist_t, labeltype >>
     searchKnn(const void *query_data, size_t k, BaseFilterFunctor* isIdAllowed = nullptr) const {
         std::priority_queue<std::pair<dist_t, labeltype >> result;
         if (cur_element_count == 0) return result;
 
         tableint currObj = enterpoint_node_;
+        //! accumulated distance for all queried variables
         dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
 
         for (int level = maxlevel_; level > 0; level--) {
@@ -1280,7 +1287,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             while (changed) {
                 changed = false;
                 unsigned int *data;
-
+                //! size_of_variables
                 data = (unsigned int *) get_linklist(currObj, level);
                 int size = getListCount(data);
                 metric_hops++;
@@ -1304,6 +1311,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates;
         bool bare_bone_search = !num_deleted_ && !isIdAllowed;
+        //! set_of_variables             
         if (bare_bone_search) {
             top_candidates = searchBaseLayerST<true>(
                     currObj, query_data, std::max(ef_, k), isIdAllowed);
